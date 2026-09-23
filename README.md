@@ -18,7 +18,7 @@ python -m pytest -q        # testes automatizados; não precisam de internet
 crypto_portfolio/
 ├── money.py           # RF2 — Amount (valor + moeda), soma entre moedas diferentes é impossível
 ├── errors.py          # RF6 — uma classe de exceção por tipo de falha de negociação
-├── assets.py          # RF4 — Asset + risco calculado de forma diferente por tipo (COIN/STABLECOIN/TOKEN)
+├── assets.py          # RF4 — Asset abstrata + Coin/Stablecoin/Token por herança
 ├── audit.py           # RF7 — Trade (frozen) + AuditTrail (só permite record(), nunca editar/apagar)
 ├── portfolio.py        # RF1 — Portfolio com estado privado; única porta de escrita é execute_trade()
 ├── risk_models.py      # RF5 — RiskModel plugável (ConservativeRiskModel, AggressiveRiskModel)
@@ -51,11 +51,10 @@ tests/test_offline.py      # valida as regras de negócio com dados simulados (n
   série já armazenada; períodos diferentes, como 30 e 180 dias, ficam
   separados. Assim o backtest continua reprodutível sem misturar históricos.
 
-- **RF4 (tipos de ativos):** `AssetType.COIN` usa volatilidade de 24h;
-  `AssetType.STABLECOIN` usa o desvio da paridade de 1 USD (uma stablecoin a
-  $0,97 pontua mais risco que uma a $1,00 mesmo com baixa volatilidade
-  numérica); `AssetType.TOKEN` combina volatilidade com uma penalidade de
-  liquidez/capitalização.
+- **RF4 (abstração e herança):** `Asset` é uma classe abstrata; `Coin`,
+  `Stablecoin` e `Token` herdam dela e implementam polimorficamente seu próprio
+  cálculo de risco. Coin usa volatilidade de 24h, Stablecoin usa o desvio da
+  paridade de 1 USD e Token combina volatilidade com penalidade de liquidez.
 
 - **RF5 (modelos de risco plugáveis):** `RiskModel` é uma interface (ABC).
   `ConservativeRiskModel` pune concentração (peso ao quadrado) com limiares de

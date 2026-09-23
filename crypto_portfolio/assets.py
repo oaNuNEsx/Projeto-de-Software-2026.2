@@ -1,25 +1,18 @@
 """
 assets.py
 ---------
-RF4 — Tipos de ativos, cada um com perfil de risco adequado ao seu tipo.
+RF4 — Abstração, herança e polimorfismo para os tipos de criptoativos.
 
-Três tipos são modelados, cada um com uma métrica de risco DIFERENTE:
-
-- COIN (ex.: BTC, ETH): risco = volatilidade de 24h.
-- STABLECOIN (ex.: USDT, USDC): risco = desvio da paridade de 1 USD.
-  Uma stablecoin cotada a $0,97 é mais arriscada que uma a $1,00, mesmo
-  que sua "volatilidade" numérica seja minúscula — por isso ela NÃO usa
-  a mesma fórmula da COIN.
-- TOKEN (altcoins menores): risco = volatilidade + penalidade por baixa
-  capitalização/liquidez (market cap rank).
-
-Cada `Asset` sabe calcular seu próprio `risk_score`, então adicionar um
-novo tipo de ativo não exige mexer em nada fora deste arquivo.
+`Asset` define o contrato comum. `Coin`, `Stablecoin` e `Token` herdam
+desse contrato e implementam seu próprio cálculo de risco.
 """
 from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
+from typing import ClassVar
 
 
 class AssetType(Enum):
@@ -29,50 +22,74 @@ class AssetType(Enum):
 
 
 @dataclass(frozen=True)
-class Asset:
-    id: str            # id da CoinGecko, ex: "bitcoin"
-    symbol: str         # ex: "BTC"
-    name: str
-    asset_type: AssetType
+class Asset(ABC):
+    """Abstração comum para qualquer criptoativo suportado."""
 
-    def risk_score(self, market_snapshot: dict) -> Decimal:
-        """
-        Retorna um score de 0 (sem risco) a 100 (risco extremo),
-        calculado de forma DIFERENTE conforme o tipo do ativo.
-        """
+    id: str
+    symbol: str
+    name: str
+    asset_type: ClassVar[AssetType]
+
+    def _market_point(self, market_snapshot: dict):
         point = market_snapshot.get(self.id)
         if point is None:
             raise ValueError(f"Sem dados de mercado para calcular risco de '{self.id}'.")
+        return point
 
-        if self.asset_type == AssetType.STABLECOIN:
-            deviation = abs(Decimal("1") - point.price_usd)
-            # deviation de 0.03 (3 centavos) já é bem significativo p/ uma stable
-            return min(Decimal("100"), deviation * Decimal("1000"))
-
-        if self.asset_type == AssetType.COIN:
-            change = abs(point.change_24h_pct)
-            return min(Decimal("100"), change * Decimal("4"))
-
-        if self.asset_type == AssetType.TOKEN:
-            change = abs(point.change_24h_pct)
-            rank = point.market_cap_rank or 9999
-            if rank > 100:
-                rank_penalty = Decimal("30")
-            elif rank > 30:
-                rank_penalty = Decimal("15")
-            else:
-                rank_penalty = Decimal("0")
-            return min(Decimal("100"), change * Decimal("3") + rank_penalty)
-
-        raise ValueError(f"Tipo de ativo desconhecido: {self.asset_type}")
+    @abstractmethod
+    def risk_score(self, market_snapshot: dict) -> Decimal:
+        """Calcula um score de 0 a 100 conforme a natureza do ativo."""
 
 
-# Registro padrão de ativos suportados pela demo (facilmente extensível).
+@dataclass(frozen=True)
+class Coin(Asset):
+    """Moeda consolidada: risco baseado na volatilidade de 24 horas."""
+
+    asset_type: ClassVar[AssetType] = AssetType.COIN
+
+    def risk_score(self, market_snapshot: dict) -> Decimal:
+        point = self._market_point(market_snapshot)
+        return min(Decimal("100"), abs(point.change_24h_pct) * Decimal("4"))
+
+
+@dataclass(frozen=True)
+class Stablecoin(Asset):
+    """Stablecoin: risco baseado no afastamento da paridade de 1 USD."""
+
+    asset_type: ClassVar[AssetType] = AssetType.STABLECOIN
+
+    def risk_score(self, market_snapshot: dict) -> Decimal:
+        point = self._market_point(market_snapshot)
+        deviation = abs(Decimal("1") - point.price_usd)
+        return min(Decimal("100"), deviation * Decimal("1000"))
+
+
+@dataclass(frozen=True)
+class Token(Asset):
+    """Token menor: combina volatilidade e penalidade por baixa liquidez."""
+
+    asset_type: ClassVar[AssetType] = AssetType.TOKEN
+
+    def risk_score(self, market_snapshot: dict) -> Decimal:
+        point = self._market_point(market_snapshot)
+        rank = point.market_cap_rank or 9999
+        if rank > 100:
+            rank_penalty = Decimal("30")
+        elif rank > 30:
+            rank_penalty = Decimal("15")
+        else:
+            rank_penalty = Decimal("0")
+        return min(
+            Decimal("100"),
+            abs(point.change_24h_pct) * Decimal("3") + rank_penalty,
+        )
+
+
 DEFAULT_ASSET_REGISTRY = {
-    "bitcoin": Asset("bitcoin", "BTC", "Bitcoin", AssetType.COIN),
-    "ethereum": Asset("ethereum", "ETH", "Ethereum", AssetType.COIN),
-    "tether": Asset("tether", "USDT", "Tether", AssetType.STABLECOIN),
-    "usd-coin": Asset("usd-coin", "USDC", "USD Coin", AssetType.STABLECOIN),
-    "solana": Asset("solana", "SOL", "Solana", AssetType.TOKEN),
-    "dogecoin": Asset("dogecoin", "DOGE", "Dogecoin", AssetType.TOKEN),
+    "bitcoin": Coin("bitcoin", "BTC", "Bitcoin"),
+    "ethereum": Coin("ethereum", "ETH", "Ethereum"),
+    "tether": Stablecoin("tether", "USDT", "Tether"),
+    "usd-coin": Stablecoin("usd-coin", "USDC", "USD Coin"),
+    "solana": Token("solana", "SOL", "Solana"),
+    "dogecoin": Token("dogecoin", "DOGE", "Dogecoin"),
 }
