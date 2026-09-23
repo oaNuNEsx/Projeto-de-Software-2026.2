@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from crypto_portfolio.money import Amount, CurrencyMismatchError
 from crypto_portfolio.errors import InsufficientPositionError, AssetNotFoundError, InsufficientBalanceError
-from crypto_portfolio.assets import DEFAULT_ASSET_REGISTRY
+from crypto_portfolio.assets import Asset, Coin, Stablecoin, Token, DEFAULT_ASSET_REGISTRY
 from crypto_portfolio.audit import TradeSide
 from crypto_portfolio.portfolio import Portfolio
 from crypto_portfolio.risk_models import get_risk_model, RiskLevel
@@ -96,13 +96,20 @@ def test_rf1_rf6_rf7_wallet_protection():
 
 def test_rf4_risk_per_asset_type():
     snapshot = make_snapshot()
+    assert isinstance(DEFAULT_ASSET_REGISTRY["bitcoin"], Coin)
+    assert isinstance(DEFAULT_ASSET_REGISTRY["tether"], Stablecoin)
+    assert isinstance(DEFAULT_ASSET_REGISTRY["dogecoin"], Token)
+    assert issubclass(Coin, Asset)
+    assert issubclass(Stablecoin, Asset)
+    assert issubclass(Token, Asset)
     btc_risk = DEFAULT_ASSET_REGISTRY["bitcoin"].risk_score(snapshot)
     usdt_risk = DEFAULT_ASSET_REGISTRY["tether"].risk_score(snapshot)
     # USDT a 0.97 (desvio de peg) deve ser considerado MAIS arriscado
     # que sua volatilidade de 0.1% sugeriria isoladamente
     assert usdt_risk > Decimal("10")
     assert btc_risk > Decimal("0")
-    print(f"RF4 OK — risco BTC(vol 24h)={btc_risk}, risco USDT(desvio de peg)={usdt_risk}")
+    print(f"RF4 OK — abstração/herança presentes; risco BTC(vol 24h)={btc_risk}, "
+          f"risco USDT(desvio de peg)={usdt_risk}")
 
 
 def test_rf5_pluggable_risk_models():
