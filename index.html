@@ -1,12 +1,372 @@
-<!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=5,IE=9" ><![endif]-->
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="pt-BR">
 <head>
-<title>Diagrama Projeto.drawio.html</title>
-<meta charset="utf-8"/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arquitetura — Crypto Portfolio</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#fff; --ink:#17202a; --muted:#5b6673;
+    --line:#6b7280; --accent:#2563eb; --soft:#eaf1ff;
+    --inherit:#7c3aed; --use:#2563eb; --compose:#059669; --api:#c2410c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif}
+  header{padding:28px 32px 18px;max-width:1900px;margin:auto}
+  h1{margin:0 0 8px;font-size:30px}
+  .sub{color:var(--muted);font-size:15px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--muted)}
+  .legend span::before{content:"";display:inline-block;width:18px;height:3px;margin:0 7px 3px 0;vertical-align:middle;background:var(--line)}
+  .legend .inh::before{background:var(--inherit)}
+  .legend .use::before{background:var(--use)}
+  .legend .comp::before{background:var(--compose)}
+  .legend .api::before{background:var(--api)}
+  .wrap{overflow:auto;padding:0 20px 30px}
+  svg{display:block;margin:auto;background:white;border:1px solid #d8dde5;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+  .group{fill:#fbfcfe;stroke:#cbd5e1;stroke-width:2;stroke-dasharray:8 6}
+  .group-title{font-weight:700;font-size:17px;fill:#334155}
+  .box{fill:#fff;stroke:#475569;stroke-width:2}
+  .abstract{fill:#f7f3ff;stroke:#7c3aed}
+  .service{fill:#eef6ff;stroke:#2563eb}
+  .data{fill:#effaf5;stroke:#059669}
+  .external{fill:#fff5eb;stroke:#c2410c}
+  .title{font-size:16px;font-weight:700;fill:#111827}
+  .stereo{font-size:12px;font-style:italic;fill:#6b7280}
+  .rf{font-size:11px;font-weight:700;fill:#2563eb}
+  .body{font-size:12.5px;fill:#374151}
+  .small{font-size:11.5px;fill:#4b5563}
+  .edge{fill:none;stroke:#2563eb;stroke-width:2.3}
+  .edge.inherit{stroke:#7c3aed}
+  .edge.compose{stroke:#059669}
+  .edge.api{stroke:#c2410c}
+  .edge.dash{stroke-dasharray:7 6}
+  .edge-label{font-size:11.5px;fill:#475569}
+  footer{max-width:1800px;margin:0 auto 35px;padding:0 28px;color:#4b5563;font-size:13px;line-height:1.5}
+  code{background:#eef2f7;padding:2px 5px;border-radius:5px}
+</style>
 </head>
 <body>
-<div class="mxgraph" style="max-width:100%;border:1px solid transparent;" data-mxgraph="{&quot;highlight&quot;:&quot;#0000ff&quot;,&quot;nav&quot;:true,&quot;resize&quot;:true,&quot;xml&quot;:&quot;&lt;mxfile host=\&quot;app.diagrams.net\&quot;&gt;&lt;diagram name=\&quot;Página-1\&quot; id=\&quot;oTbOo2-YHSf1C4nmZLzO\&quot;&gt;&lt;mxGraphModel dx=\&quot;1407\&quot; dy=\&quot;774\&quot; grid=\&quot;1\&quot; gridSize=\&quot;10\&quot; guides=\&quot;1\&quot; tooltips=\&quot;1\&quot; connect=\&quot;1\&quot; arrows=\&quot;1\&quot; fold=\&quot;1\&quot; page=\&quot;1\&quot; pageScale=\&quot;1\&quot; pageWidth=\&quot;827\&quot; pageHeight=\&quot;1169\&quot; math=\&quot;0\&quot; shadow=\&quot;0\&quot;&gt;&lt;root&gt;&lt;mxCell id=\&quot;0\&quot;/&gt;&lt;mxCell id=\&quot;1\&quot; parent=\&quot;0\&quot;/&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-32\&quot; edge=\&quot;1\&quot; parent=\&quot;1\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startSize=14;strokeWidth=4;\&quot; value=\&quot; \&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;&lt;mxPoint x=\&quot;470\&quot; y=\&quot;440.33\&quot; as=\&quot;sourcePoint\&quot;/&gt;&lt;mxPoint x=\&quot;620\&quot; y=\&quot;440.3333333333335\&quot; as=\&quot;targetPoint\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-5\&quot; parent=\&quot;1\&quot; style=\&quot;swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;\&quot; value=\&quot;&amp;lt;b&amp;gt;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;Carteira&amp;lt;/font&amp;gt;&amp;lt;/b&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;260\&quot; width=\&quot;360\&quot; x=\&quot;40\&quot; y=\&quot;310\&quot; as=\&quot;geometry\&quot;&gt;&lt;mxRectangle height=\&quot;50\&quot; width=\&quot;90\&quot; x=\&quot;430\&quot; y=\&quot;310\&quot; as=\&quot;alternateBounds\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-22\&quot; edge=\&quot;1\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-5\&quot; style=\&quot;endArrow=none;html=1;rounded=0;\&quot; value=\&quot;\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;&lt;Array as=\&quot;points\&quot;&gt;&lt;mxPoint x=\&quot;350\&quot; y=\&quot;130\&quot;/&gt;&lt;/Array&gt;&lt;mxPoint y=\&quot;130\&quot; as=\&quot;sourcePoint\&quot;/&gt;&lt;mxPoint x=\&quot;360\&quot; y=\&quot;130.29411764705878\&quot; as=\&quot;targetPoint\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-6\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-5\&quot; style=\&quot;align=center;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;\&quot; value=\&quot;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;- Ativos&amp;amp;nbsp;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;&amp;lt;br&amp;gt;+ Comprar()&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;+ Vender()&amp;amp;nbsp;&amp;lt;br&amp;gt;+ valorTotal()&amp;amp;nbsp;&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;/font&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;210\&quot; width=\&quot;360\&quot; y=\&quot;50\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-26\&quot; parent=\&quot;1\&quot; style=\&quot;swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;container=0;\&quot; value=\&quot;&amp;lt;b&amp;gt;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;Criptomoeda&amp;lt;/font&amp;gt;&amp;lt;/b&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;260\&quot; width=\&quot;360\&quot; x=\&quot;680\&quot; y=\&quot;310\&quot; as=\&quot;geometry\&quot;&gt;&lt;mxRectangle height=\&quot;50\&quot; width=\&quot;90\&quot; x=\&quot;430\&quot; y=\&quot;310\&quot; as=\&quot;alternateBounds\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-28\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-26\&quot; style=\&quot;align=center;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;\&quot; value=\&quot;&amp;lt;br&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;font-size: 20px; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;- nome : String&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;font style=&amp;quot;&amp;quot;&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify; font-size: 20px;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;- simbolo: String&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify; font-size: 20px;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;- quantidade: double&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify; font-size: 20px;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;- precoAtual: double&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;&amp;lt;br&amp;gt;&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;div style=&amp;quot;&amp;quot;&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;&amp;lt;br&amp;gt;&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;span style=&amp;quot;font-size: 20px; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;&amp;lt;div style=&amp;quot;text-align: justify;&amp;quot;&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;+ atualizarPreco ()&amp;lt;/span&amp;gt;&amp;lt;span style=&amp;quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&amp;quot;&amp;gt;&amp;amp;nbsp;&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;/span&amp;gt;&amp;lt;/div&amp;gt;&amp;lt;/font&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;210\&quot; width=\&quot;360\&quot; y=\&quot;50\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-27\&quot; edge=\&quot;1\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-26\&quot; style=\&quot;endArrow=none;html=1;rounded=0;\&quot; value=\&quot;\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;&lt;Array as=\&quot;points\&quot;&gt;&lt;mxPoint x=\&quot;350\&quot; y=\&quot;190\&quot;/&gt;&lt;/Array&gt;&lt;mxPoint y=\&quot;190\&quot; as=\&quot;sourcePoint\&quot;/&gt;&lt;mxPoint x=\&quot;360\&quot; y=\&quot;190.29411764705878\&quot; as=\&quot;targetPoint\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-29\&quot; parent=\&quot;1\&quot; style=\&quot;swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;\&quot; value=\&quot;&amp;lt;span style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;&amp;lt;b&amp;gt;CoinGeckoService&amp;lt;/b&amp;gt;&amp;lt;/span&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;130\&quot; width=\&quot;360\&quot; x=\&quot;680\&quot; y=\&quot;760\&quot; as=\&quot;geometry\&quot;&gt;&lt;mxRectangle height=\&quot;50\&quot; width=\&quot;90\&quot; x=\&quot;430\&quot; y=\&quot;310\&quot; as=\&quot;alternateBounds\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-30\&quot; edge=\&quot;1\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-29\&quot; style=\&quot;endArrow=none;html=1;rounded=0;\&quot; value=\&quot;\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;&lt;Array as=\&quot;points\&quot;&gt;&lt;mxPoint x=\&quot;350\&quot; y=\&quot;130\&quot;/&gt;&lt;/Array&gt;&lt;mxPoint y=\&quot;130\&quot; as=\&quot;sourcePoint\&quot;/&gt;&lt;mxPoint x=\&quot;360\&quot; y=\&quot;130.29411764705878\&quot; as=\&quot;targetPoint\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-31\&quot; parent=\&quot;x7YhAFT3Il0TPF6hLqCQ-29\&quot; style=\&quot;align=center;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;\&quot; value=\&quot;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;+ buscarPreco (simbolo)&amp;lt;/font&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;80\&quot; width=\&quot;360\&quot; y=\&quot;50\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-33\&quot; edge=\&quot;1\&quot; parent=\&quot;1\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startSize=14;strokeWidth=4;\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;&lt;mxPoint x=\&quot;859.41\&quot; y=\&quot;740\&quot; as=\&quot;sourcePoint\&quot;/&gt;&lt;mxPoint x=\&quot;859.41\&quot; y=\&quot;598.67\&quot; as=\&quot;targetPoint\&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-34\&quot; parent=\&quot;1\&quot; style=\&quot;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;\&quot; value=\&quot;&amp;lt;b&amp;gt;&amp;lt;font style=&amp;quot;font-size: 30px;&amp;quot;&amp;gt;1&amp;lt;/font&amp;gt;&amp;lt;/b&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;30\&quot; width=\&quot;60\&quot; x=\&quot;414\&quot; y=\&quot;425\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-35\&quot; parent=\&quot;1\&quot; style=\&quot;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1\&quot; value=\&quot;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;consultaPreço&amp;lt;/font&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;30\&quot; width=\&quot;140\&quot; x=\&quot;900\&quot; y=\&quot;660\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=\&quot;x7YhAFT3Il0TPF6hLqCQ-39\&quot; parent=\&quot;1\&quot; style=\&quot;text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;\&quot; value=\&quot;&amp;lt;font style=&amp;quot;font-size: 20px;&amp;quot;&amp;gt;&amp;lt;b&amp;gt;contem&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;\&quot; vertex=\&quot;1\&quot;&gt;&lt;mxGeometry height=\&quot;50\&quot; width=\&quot;140\&quot; x=\&quot;474\&quot; y=\&quot;480\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;&quot;,&quot;toolbar&quot;:&quot;pages zoom layers lightbox&quot;,&quot;page&quot;:0}"></div>
-<script type="text/javascript" src="https://app.diagrams.net/js/viewer-static.min.js"></script>
+<header>
+  <h1>Crypto Portfolio — Diagrama de Arquitetura e Classes</h1>
+  <div class="sub">Representação atual do projeto Python, organizada pelos requisitos RF1 → RF10.</div>
+  <div class="legend">
+    <span class="inh">Herança / implementação</span>
+    <span class="use">Uso / dependência</span>
+    <span class="comp">Composição / contém</span>
+    <span class="api">Integração externa</span>
+  </div>
+</header>
+
+<div class="wrap">
+<svg width="1800" height="1290" viewBox="0 0 1800 1290" role="img" aria-label="Diagrama do projeto Crypto Portfolio">
+<defs>
+  <marker id="arrow-use" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker>
+  <marker id="arrow-inh" markerWidth="12" markerHeight="12" refX="10" refY="5" orient="auto"><path d="M0,5 L10,0 L10,10 z" fill="white" stroke="#7c3aed" stroke-width="1.5"/></marker>
+  <marker id="diamond" markerWidth="14" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M0,5 L5,1 L10,5 L5,9 z" fill="#059669"/></marker>
+  <marker id="arrow-api" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#c2410c"/></marker>
+</defs>
+
+<!-- Groups -->
+<rect class="group" x="25" y="25" width="730" height="520" rx="18"/>
+<text class="group-title" x="45" y="55">Domínio da carteira, dinheiro e auditoria</text>
+
+<rect class="group" x="785" y="25" width="990" height="520" rx="18"/>
+<text class="group-title" x="805" y="55">Ativos e avaliação de risco</text>
+
+<rect class="group" x="25" y="580" width="925" height="675" rx="18"/>
+<text class="group-title" x="45" y="610">Estratégias e torneio</text>
+
+<rect class="group" x="980" y="580" width="795" height="675" rx="18"/>
+<text class="group-title" x="1000" y="610">Dados de mercado e CoinGecko</text>
+
+<!-- Portfolio -->
+<g>
+<rect class="box" x="70" y="90" width="310" height="210" rx="12"/>
+<text class="rf" x="88" y="114">RF1</text>
+<text class="title" x="88" y="140">Portfolio</text>
+<text class="body" x="88" y="168">- __cash: Amount</text>
+<text class="body" x="88" y="189">- __positions: Dict[str, Decimal]</text>
+<text class="body" x="88" y="210">- audit_trail: AuditTrail</text>
+<text class="body" x="88" y="240">+ quantity_of()</text>
+<text class="body" x="88" y="261">+ total_value_usd()</text>
+<text class="body" x="88" y="282">+ execute_trade()</text>
+</g>
+
+<!-- Amount -->
+<g>
+<rect class="box data" x="445" y="90" width="265" height="185" rx="12"/>
+<text class="rf" x="463" y="114">RF2</text>
+<text class="title" x="463" y="140">Amount</text>
+<text class="stereo" x="463" y="159">«frozen dataclass»</text>
+<text class="body" x="463" y="185">- value: Decimal</text>
+<text class="body" x="463" y="206">- currency: str</text>
+<text class="body" x="463" y="236">+ __add__ / __sub__()</text>
+<text class="body" x="463" y="257">+ convert_to()</text>
+</g>
+
+<!-- Audit -->
+<g>
+<rect class="box data" x="70" y="355" width="270" height="160" rx="12"/>
+<text class="rf" x="88" y="379">RF7</text>
+<text class="title" x="88" y="405">AuditTrail</text>
+<text class="body" x="88" y="434">+ record()</text>
+<text class="body" x="88" y="455">+ entries: Tuple[Trade, ...]</text>
+<text class="body" x="88" y="476">+ __len__ / __iter__()</text>
+</g>
+
+<g>
+<rect class="box data" x="430" y="345" width="280" height="175" rx="12"/>
+<text class="rf" x="448" y="369">RF7</text>
+<text class="title" x="448" y="395">Trade</text>
+<text class="stereo" x="448" y="414">«frozen dataclass»</text>
+<text class="body" x="448" y="439">trade_id · asset_id · side</text>
+<text class="body" x="448" y="460">quantity · price_usd</text>
+<text class="body" x="448" y="481">cash_currency · cash_amount</text>
+</g>
+
+<!-- Assets -->
+<g>
+<rect class="box abstract" x="1160" y="80" width="400" height="170" rx="12"/>
+<text class="rf" x="1178" y="104">RF4</text>
+<text class="title" x="1178" y="130">Asset</text>
+<text class="stereo" x="1178" y="150">«abstract, frozen dataclass»</text>
+<text class="body" x="1178" y="179">- asset_id · symbol · asset_type</text>
+<text class="body" x="1178" y="207">+ risk_score(snapshot)</text>
+</g>
+
+<g>
+<rect class="box" x="1085" y="330" width="200" height="150" rx="12"/>
+<text class="title" x="1103" y="360">Coin</text>
+<text class="small" x="1103" y="389">risk_score(): volatilidade</text>
+<text class="small" x="1103" y="411">Ex.: Bitcoin</text>
+</g>
+<g>
+<rect class="box" x="1320" y="330" width="200" height="150" rx="12"/>
+<text class="title" x="1338" y="360">Stablecoin</text>
+<text class="small" x="1338" y="389">risk_score(): desvio de US$ 1</text>
+<text class="small" x="1338" y="411">Ex.: Tether</text>
+</g>
+<g>
+<rect class="box" x="1555" y="330" width="190" height="150" rx="12"/>
+<text class="title" x="1573" y="360">Token</text>
+<text class="small" x="1573" y="389">risk_score(): volatilidade</text>
+<text class="small" x="1573" y="411">+ penalidade de ranking</text>
+</g>
+
+<!-- Risk models -->
+<g>
+<rect class="box abstract" x="815" y="80" width="245" height="170" rx="12"/>
+<text class="rf" x="833" y="104">RF5</text>
+<text class="title" x="833" y="130">RiskModel</text>
+<text class="stereo" x="833" y="150">«abstract»</text>
+<text class="body" x="833" y="179">+ score_portfolio()</text>
+<text class="body" x="833" y="200">+ classify()</text>
+<text class="body" x="833" y="221">+ evaluate()</text>
+</g>
+
+<g>
+<rect class="box" x="805" y="330" width="0" height="0" rx="12"/>
+</g>
+<g>
+<rect class="box" x="805" y="270" width="250" height="0" rx="12" opacity="0"/>
+</g>
+<g>
+<rect class="box" x="800" y="0" width="0" height="0" opacity="0"/>
+</g>
+
+<!-- Risk model children, positioned left of assets -->
+<g>
+<rect class="box" x="805" y="270" width="250" height="0" opacity="0"/>
+</g>
+<g>
+<rect class="box" x="810" y="285" width="245" height="0" opacity="0"/>
+</g>
+
+<!-- smaller children below RiskModel -->
+<g>
+<rect class="box" x="805" y="330" width="0" height="0" opacity="0"/>
+</g>
+
+<!-- Use separate cards upper-mid -->
+<g>
+<rect class="box" x="800" y="300" width="245" height="95" rx="12"/>
+<text class="title" x="818" y="330">ConservativeRiskModel</text>
+<text class="small" x="818" y="355">penaliza exposição a cripto</text>
+</g>
+<g>
+<rect class="box" x="800" y="420" width="245" height="95" rx="12"/>
+<text class="title" x="818" y="450">AggressiveRiskModel</text>
+<text class="small" x="818" y="475">foca concentração da carteira</text>
+</g>
+
+<!-- Strategies -->
+<g>
+<rect class="box abstract" x="90" y="650" width="300" height="170" rx="12"/>
+<text class="rf" x="108" y="674">RF9</text>
+<text class="title" x="108" y="700">Strategy</text>
+<text class="stereo" x="108" y="720">«abstract»</text>
+<text class="body" x="108" y="749">+ evaluate(portfolio, snapshot,</text>
+<text class="body" x="108" y="770">  registry, context)</text>
+<text class="body" x="108" y="798">@register_strategy</text>
+</g>
+
+<g>
+<rect class="box" x="60" y="900" width="190" height="115" rx="12"/>
+<text class="title" x="78" y="932">HodlStrategy</text>
+<text class="small" x="78" y="960">MANter posições</text>
+</g>
+<g>
+<rect class="box" x="275" y="900" width="190" height="115" rx="12"/>
+<text class="title" x="293" y="932">DcaStrategy</text>
+<text class="small" x="293" y="960">aporte periódico</text>
+</g>
+<g>
+<rect class="box" x="490" y="900" width="205" height="115" rx="12"/>
+<text class="title" x="508" y="932">RebalanceStrategy</text>
+<text class="small" x="508" y="960">restaura pesos-alvo</text>
+</g>
+<g>
+<rect class="box" x="720" y="900" width="190" height="115" rx="12"/>
+<text class="title" x="738" y="932">StopLossStrategy</text>
+<text class="small" x="738" y="960">limita perdas</text>
+</g>
+
+<!-- Tournament -->
+<g>
+<rect class="box service" x="315" y="1085" width="330" height="140" rx="12"/>
+<text class="rf" x="333" y="1109">RF10</text>
+<text class="title" x="333" y="1135">Tournament</text>
+<text class="body" x="333" y="1164">+ run(initial_cash_usd)</text>
+<text class="small" x="333" y="1188">descobre estratégias registradas</text>
+<text class="small" x="333" y="1207">e classifica o retorno do backtest</text>
+</g>
+
+<!-- Market data -->
+<g>
+<rect class="box service" x="1025" y="650" width="310" height="185" rx="12"/>
+<text class="rf" x="1043" y="674">RF8</text>
+<text class="title" x="1043" y="700">PriceService</text>
+<text class="body" x="1043" y="729">- cache com TTL</text>
+<text class="body" x="1043" y="750">- TokenBucketRateLimiter</text>
+<text class="body" x="1043" y="771">+ get_prices()</text>
+<text class="body" x="1043" y="792">+ retry/backoff para HTTP 429</text>
+</g>
+
+<g>
+<rect class="box service" x="1025" y="900" width="310" height="175" rx="12"/>
+<text class="rf" x="1043" y="924">RF3 / RF8</text>
+<text class="title" x="1043" y="950">HistoricalDataStore</text>
+<text class="body" x="1043" y="979">+ fetch(coin_id, days)</text>
+<text class="body" x="1043" y="1000">+ get(coin_id, days)</text>
+<text class="small" x="1043" y="1027">cache por ativo + período</text>
+</g>
+
+<g>
+<rect class="box data" x="1440" y="650" width="285" height="145" rx="12"/>
+<text class="title" x="1458" y="680">MarketPoint</text>
+<text class="stereo" x="1458" y="699">«frozen dataclass»</text>
+<text class="small" x="1458" y="727">price_usd · price_brl</text>
+<text class="small" x="1458" y="748">change_24h_pct · rank</text>
+</g>
+
+<g>
+<rect class="box data" x="1440" y="880" width="285" height="165" rx="12"/>
+<text class="rf" x="1458" y="904">RF3</text>
+<text class="title" x="1458" y="930">HistoricalSeries</text>
+<text class="body" x="1458" y="959">- points: Tuple[PricePoint, ...]</text>
+<text class="body" x="1458" y="980">+ price_at_or_before()</text>
+<text class="small" x="1458" y="1008">histórico imutável</text>
+</g>
+
+<g>
+<rect class="box data" x="1440" y="1090" width="285" height="120" rx="12"/>
+<text class="title" x="1458" y="1120">PricePoint</text>
+<text class="stereo" x="1458" y="1139">«frozen dataclass»</text>
+<text class="small" x="1458" y="1166">timestamp_ms · price_usd</text>
+</g>
+
+<g>
+<rect class="box external" x="1070" y="1120" width="250" height="95" rx="12"/>
+<text class="title" x="1088" y="1150">CoinGecko API</text>
+<text class="small" x="1088" y="1177">preços atuais + histórico</text>
+</g>
+
+<!-- Errors note -->
+<g>
+<rect class="box" x="445" y="305" width="265" height="0" opacity="0"/>
+</g>
+<g>
+<rect class="box" x="400" y="0" width="0" height="0" opacity="0"/>
+</g>
+<text class="rf" x="445" y="315">RF6: errors.py define exceções específicas usadas por Portfolio e market_data.</text>
+
+<!-- Edges Domain -->
+<path class="edge compose" d="M380 175 H445" marker-start="url(#diamond)"/>
+<text class="edge-label" x="387" y="163">caixa</text>
+
+<path class="edge compose" d="M225 300 V355" marker-start="url(#diamond)"/>
+<text class="edge-label" x="237" y="333">auditoria</text>
+
+<path class="edge compose" d="M340 430 H430" marker-start="url(#diamond)"/>
+<text class="edge-label" x="356" y="418">contém</text>
+
+<!-- Risk and Assets -->
+<path class="edge inherit" d="M927 300 V250" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M927 420 C790 420 790 270 885 250" marker-end="url(#arrow-inh)"/>
+
+<path class="edge inherit" d="M1185 330 C1185 285 1240 275 1240 250" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M1420 330 C1420 285 1360 275 1360 250" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M1650 330 C1650 280 1500 275 1500 250" marker-end="url(#arrow-inh)"/>
+
+<path class="edge dash" d="M380 120 C610 60 700 80 815 155" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="600" y="72">avaliado por</text>
+
+<path class="edge dash" d="M380 220 C700 260 900 195 1160 175" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="690" y="245">asset_registry</text>
+
+<!-- Strategies inheritance -->
+<path class="edge inherit" d="M155 900 C155 860 180 840 205 820" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M370 900 C370 855 320 840 285 820" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M590 900 C590 845 390 845 340 820" marker-end="url(#arrow-inh)"/>
+<path class="edge inherit" d="M815 900 C815 825 420 855 380 790" marker-end="url(#arrow-inh)"/>
+
+<path class="edge" d="M480 1085 V1035 C480 1005 480 1005 480 995" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="492" y="1057">executa todas</text>
+
+<path class="edge dash" d="M390 735 C520 690 620 690 755 705 C860 715 900 740 1025 740" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="690" y="688">usa snapshot</text>
+
+<path class="edge dash" d="M645 1155 C870 1155 980 1030 1025 990" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="810" y="1138">usa históricos</text>
+
+<!-- Market data -->
+<path class="edge" d="M1335 735 H1440" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="1360" y="721">retorna</text>
+
+<path class="edge" d="M1335 975 H1440" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="1360" y="961">retorna</text>
+
+<path class="edge compose" d="M1582 1045 V1090" marker-start="url(#diamond)"/>
+<text class="edge-label" x="1595" y="1072">pontos</text>
+
+<path class="edge api" d="M1155 835 V1120" marker-end="url(#arrow-api)"/>
+<text class="edge-label" x="1167" y="865">HTTP</text>
+
+<path class="edge api" d="M1240 1075 V1120" marker-end="url(#arrow-api)"/>
+<text class="edge-label" x="1252" y="1104">HTTP</text>
+
+<!-- Cross deps -->
+<path class="edge dash" d="M1025 700 C870 625 620 590 380 260" marker-end="url(#arrow-use)"/>
+<text class="edge-label" x="680" y="575">dados para demonstração/avaliação</text>
+
+</svg>
+</div>
+
+<footer>
+  <strong>Leitura do diagrama:</strong> o <code>main.py</code> apenas orquestra as demonstrações RF1→RF10.
+  As regras de negócio permanecem nos módulos de <code>crypto_portfolio</code>. O RF6 é transversal:
+  <code>errors.py</code> fornece exceções específicas usadas principalmente por <code>Portfolio</code> e pelos serviços de mercado.
+  O diagrama prioriza as relações arquiteturais relevantes para a apresentação, sem listar cada atributo interno.
+</footer>
 </body>
 </html>
