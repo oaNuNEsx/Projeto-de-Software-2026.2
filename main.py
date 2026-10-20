@@ -30,6 +30,7 @@ from crypto_portfolio.market_data import (
 )
 from crypto_portfolio.money import Amount, CurrencyMismatchError
 from crypto_portfolio.portfolio import Portfolio
+from crypto_portfolio.portfolio_builder import PortfolioBuilder
 from crypto_portfolio.risk_models import get_risk_model
 from crypto_portfolio.strategies import available_strategies
 from crypto_portfolio.tournament import Tournament
@@ -329,12 +330,12 @@ def demonstrar_rf5() -> None:
     )
 
     snapshot = snapshot_sintetico()
-    portfolio = Portfolio("USD", Decimal("100000"), DEFAULT_ASSET_REGISTRY)
-    portfolio.execute_trade(
-        "bitcoin", TradeSide.BUY, Decimal("1.05"), snapshot["bitcoin"].price_usd
-    )
-    portfolio.execute_trade(
-        "ethereum", TradeSide.BUY, Decimal("9"), snapshot["ethereum"].price_usd
+    portfolio = (
+        PortfolioBuilder(DEFAULT_ASSET_REGISTRY)
+        .com_caixa_inicial(Decimal("100000"))
+        .com_posicao("bitcoin", Decimal("1.05"), snapshot["bitcoin"].price_usd)
+        .com_posicao("ethereum", Decimal("9"), snapshot["ethereum"].price_usd)
+        .build()
     )
 
     escolha = input(
@@ -524,9 +525,13 @@ def demonstrar_rf9() -> None:
         "bitcoin": MarketPoint(Decimal("100"), Decimal("500"), Decimal("-12"), 1),
         "ethereum": MarketPoint(Decimal("50"), Decimal("250"), Decimal("2"), 2),
     }
-    portfolio = Portfolio("USD", Decimal("10000"), DEFAULT_ASSET_REGISTRY)
-    portfolio.execute_trade("bitcoin", TradeSide.BUY, Decimal("20"), Decimal("100"))
-    portfolio.execute_trade("ethereum", TradeSide.BUY, Decimal("40"), Decimal("50"))
+    portfolio = (
+        PortfolioBuilder(DEFAULT_ASSET_REGISTRY)
+        .com_caixa_inicial(Decimal("10000"))
+        .com_posicao("bitcoin", Decimal("20"), Decimal("100"))
+        .com_posicao("ethereum", Decimal("40"), Decimal("50"))
+        .build()
+    )
 
     strategies = available_strategies()
     print(f"  Estratégias registradas automaticamente: {list(strategies.keys())}")
