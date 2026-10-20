@@ -107,12 +107,15 @@ class Tournament:
         results: List[BacktestResult] = []
         initial_snapshot = self._snapshot_at(timestamps[0])
 
+        # Prototype: a carteira inicial é montada UMA vez e cada estratégia recebe um clone,
+        # então todas partem exatamente do mesmo estado (RF10) por construção.
+        carteira_inicial = Portfolio(base_currency, initial_cash_usd, self.asset_registry, AuditTrail())
+        self._seed_portfolio(carteira_inicial, initial_cash_usd, initial_snapshot)
+        initial_value = carteira_inicial.total_value_usd(initial_snapshot).value + carteira_inicial.cash.value
+
         for name, strategy_cls in available_strategies().items():
             strategy = strategy_cls()
-            portfolio = Portfolio(base_currency, initial_cash_usd, self.asset_registry, AuditTrail())
-            self._seed_portfolio(portfolio, initial_cash_usd, initial_snapshot)
-
-            initial_value = portfolio.total_value_usd(initial_snapshot).value + portfolio.cash.value
+            portfolio = carteira_inicial.clonar()
 
             for ts in timestamps:
                 snapshot = self._snapshot_at(ts)

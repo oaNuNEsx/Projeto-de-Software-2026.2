@@ -63,6 +63,20 @@ class AuditTrail:
             self._entries.append(trade)
             return trade
 
+    def clonar(self) -> "AuditTrail":
+        """
+        Prototype: histórico independente, com as mesmas negociações e o mesmo contador.
+
+        `Trade` é frozen, então os objetos podem ser compartilhados; a lista e o
+        contador são copiados (sem isso, registrar numa cópia apareceria na outra) e
+        o `Lock` é novo, porque um `threading.Lock` não pode ser copiado.
+        """
+        copia = AuditTrail()
+        with self._lock:
+            copia._entries = list(self._entries)
+            copia._counter = self._counter
+        return copia
+
     @property
     def entries(self) -> Tuple[Trade, ...]:
         """Sempre uma cópia — mutar a tupla retornada não afeta o histórico real."""

@@ -75,6 +75,33 @@ class Portfolio:
                 total += qty * point.price_usd
         return Amount(total, "USD")
 
+    # ---------------- cópia (Prototype) ----------------
+    def clonar(self) -> "Portfolio":
+        """
+        Prototype: devolve uma carteira INDEPENDENTE com o mesmo estado desta.
+
+        Copiar tudo cegamente não funciona: `copy.deepcopy` falha por causa do
+        `threading.Lock`, e `copy.copy` compartilharia `__positions` e a trilha de
+        auditoria. Por isso a decisão é tomada atributo a atributo:
+
+          - moeda base e caixa (`Amount` é frozen) ... reaproveitados
+          - `__positions` (dict mutável) ............. copiado
+          - trilha de auditoria ...................... clonada (`AuditTrail.clonar`)
+          - `__asset_registry` ....................... COMPARTILHADO de propósito
+                                                       (dado de referência, não estado)
+          - `__lock` ................................. novo (um Lock não é copiável)
+
+        A cópia é feita sob o mesmo lock de `execute_trade`, então nunca captura um
+        estado pela metade (caixa de uma operação, posições de outra). Isto NÃO abre
+        uma porta de escrita (RF1): continua não existindo setter público, e a única
+        forma de alterar o clone é o `execute_trade` dele.
+        """
+        with self.__lock:
+            copia = Portfolio(self.__base_currency, self.__cash.value,
+                              self.__asset_registry, self.__audit.clonar())
+            copia.__positions = dict(self.__positions)
+        return copia
+
     # ---------------- única porta de escrita ----------------
     def execute_trade(self, asset_id: str, side: TradeSide, quantity, price_usd,
                        fx_usd_to_base: Decimal = Decimal("1")) -> Trade:
