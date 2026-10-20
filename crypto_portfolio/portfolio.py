@@ -1,139 +1,99 @@
 """
-portfolio.py
-------------
-RF1 — Carteira protegida.
+portfolio_builder.py
+--------------------
+Builder para montar uma `Portfolio` em etapas nomeadas, validando tudo ANTES de a
+carteira existir.
 
-`Portfolio` guarda `__cash` e `__positions` com name-mangling (atributos
-"privados" de verdade em Python: `self.__cash` vira `_Portfolio__cash`).
-Não existe NENHUM setter público para eles — as únicas formas de ler são
-propriedades que devolvem cópias/valores imutáveis (`Amount` é frozen;
-`positions` devolve um `dict` novo a cada chamada).
+Toda posição é aplicada por `Portfolio.execute_trade()`. Por isso RF1 (carteira
+protegida), RF6 (erros específicos) e RF7 (trilha de auditoria) continuam valendo
+para a carteira montada: o Builder nunca escreve estado diretamente.
 
-A ÚNICA forma de alterar saldo ou posições é `execute_trade`, que:
-  1. Valida tudo (ativo existe, quantidade/preço/taxa > 0, saldo/posição suficiente)
-     ANTES de tocar em qualquer estado interno — se alguma validação
-     falhar, uma exceção específica (RF6) é lançada e o estado
-     permanece 100% intocado.
-  2. Só então aplica a mutação e grava na `AuditTrail` (RF7).
-
-Isso torna "vender 0,5 BTC tendo 0,3" impossível de corromper o estado:
-a exceção `InsufficientPositionError` é lançada antes de qualquer débito.
+Uso:
+    carteira = (PortfolioBuilder(DEFAULT_ASSET_REGISTRY)
+                .com_moeda_base("USD")
+                .com_caixa_inicial(10000)
+                .com_precos(snapshot)
+                .com_posicao_por_peso("bitcoin", "0.35")   # 35% do caixa inicial em BTC
+                .com_posicao("ethereum", 2, 3000)          # 2 ETH a USD 3000
+                .build())
 """
 from __future__ import annotations
-import threading
+
 from decimal import Decimal
-from typing import Dict
+from typing import Dict, List, Tuple
 
-from .money import Amount
-from .errors import (
-    AssetNotFoundError,
-    InsufficientBalanceError,
-    InsufficientPositionError,
-    InvalidQuantityError,
-    InvalidPriceError,
-    InvalidExchangeRateError,
-)
-from .audit import AuditTrail, Trade, TradeSide
 from .assets import Asset
+from .audit import AuditTrail, TradeSide
+from .market_data import MarketPoint
+from .portfolio import Portfolio
 
 
-class Portfolio:
-    def __init__(self, base_currency: str, initial_cash: Decimal,
-                 asset_registry: Dict[str, Asset], audit_trail: AuditTrail | None = None):
-        self.__base_currency = base_currency.upper()
-        self.__cash = Amount(Decimal(str(initial_cash)), self.__base_currency)
-        self.__positions: Dict[str, Decimal] = {}
-        self.__asset_registry = asset_registry
-        self.__audit = audit_trail if audit_trail is not None else AuditTrail()
-        self.__lock = threading.Lock()
+class PortfolioBuilder:
+    def __init__(self, asset_registry: Dict[str, Asset]):
+        self._registry = asset_registry
+        self._moeda = "USD"
+        self._caixa = Decimal("0")
+        self._precos: Dict[str, MarketPoint] | None = None
+        self._pesos: Dict[str, Decimal] = {}
+        # (asset_id, quantidade, preço em USD, câmbio USD -> moeda base)
+        self._ordens: List[Tuple[str, Decimal, Decimal, Decimal]] = []
 
-    # ---------------- leitura somente ----------------
-    @property
-    def base_currency(self) -> str:
-        return self.__base_currency
+    # ---------------- etapas (cada uma devolve o próprio builder) ----------------
+    def com_moeda_base(self, moeda: str) -> "PortfolioBuilder":
+        self._moeda = moeda
+        return self
 
-    @property
-    def cash(self) -> Amount:
-        return self.__cash  # Amount é imutável (frozen)
+    def com_caixa_inicial(self, valor) -> "PortfolioBuilder":
+        self._caixa = Decimal(str(valor))
+        return self
 
-    @property
-    def positions(self) -> Dict[str, Decimal]:
-        return dict(self.__positions)  # cópia defensiva
+    def com_precos(self, snapshot: Dict[str, MarketPoint]) -> "PortfolioBuilder":
+        """Preços usados para converter pesos em quantidades (ver com_posicao_por_peso)."""
+        self._precos = snapshot
+        return self
 
-    @property
-    def audit_trail(self) -> AuditTrail:
-        return self.__audit
+    def com_posicao_por_peso(self, asset_id: str, peso) -> "PortfolioBuilder":
+        """Compra `peso` (0 a 1) do caixa inicial no ativo, ao preço informado em com_precos()."""
+        self._pesos[asset_id] = Decimal(str(peso))
+        return self
 
-    def quantity_of(self, asset_id: str) -> Decimal:
-        return self.__positions.get(asset_id, Decimal("0"))
+    def com_posicao(self, asset_id: str, quantidade, preco_usd,
+                    fx_usd_to_base=Decimal("1")) -> "PortfolioBuilder":
+        """Compra uma quantidade fixa do ativo (mesmos argumentos de Portfolio.execute_trade)."""
+        self._ordens.append((asset_id, Decimal(str(quantidade)), Decimal(str(preco_usd)),
+                             Decimal(str(fx_usd_to_base))))
+        return self
 
-    def total_value_usd(self, market_snapshot: dict) -> Amount:
-        total = Decimal("0")
-        for asset_id, qty in self.__positions.items():
-            point = market_snapshot.get(asset_id)
-            if point is not None:
-                total += qty * point.price_usd
-        return Amount(total, "USD")
+    # ---------------- validação (única definição da regra dos pesos) ----------------
+    @staticmethod
+    def validar_pesos(pesos: Dict[str, Decimal]) -> None:
+        """Regra que o Tournament aplicava sozinho: soma entre 0 e 1 e nenhum peso negativo."""
+        total = sum(pesos.values(), Decimal("0"))
+        if total < 0 or total > 1:
+            raise ValueError("A soma dos pesos iniciais deve ficar entre 0 e 1.")
+        if any(peso < 0 for peso in pesos.values()):
+            raise ValueError("Pesos iniciais não podem ser negativos.")
 
-    # ---------------- única porta de escrita ----------------
-    def execute_trade(self, asset_id: str, side: TradeSide, quantity, price_usd,
-                       fx_usd_to_base: Decimal = Decimal("1")) -> Trade:
-        """
-        Único método capaz de alterar `cash`/`positions`.
-        Levanta uma exceção específica (RF6) e NÃO altera nada se a
-        negociação for inválida por qualquer motivo.
-        """
-        if asset_id not in self.__asset_registry:
-            raise AssetNotFoundError(asset_id)
+    # ---------------- montagem ----------------
+    def build(self) -> Portfolio:
+        # Tudo é validado antes de existir uma carteira.
+        self.validar_pesos(self._pesos)
+        if self._pesos and self._precos is None:
+            raise ValueError("Posições por peso exigem preços: chame com_precos(snapshot).")
 
-        quantity = Decimal(str(quantity))
-        if quantity <= 0:
-            raise InvalidQuantityError(quantity)
+        carteira = Portfolio(self._moeda, self._caixa, self._registry, AuditTrail())
 
-        price_usd = Decimal(str(price_usd))
-        if price_usd <= 0:
-            raise InvalidPriceError(price_usd)
+        for asset_id, peso in self._pesos.items():
+            ponto = self._precos.get(asset_id)
+            if peso == 0 or ponto is None or ponto.price_usd <= 0:
+                continue
+            quantidade = ((self._caixa * peso) / ponto.price_usd).quantize(Decimal("0.00000001"))
+            if quantidade > 0:
+                carteira.execute_trade(asset_id, TradeSide.BUY, quantidade, ponto.price_usd,
+                                       fx_usd_to_base=Decimal("1"))
 
-        fx_usd_to_base = Decimal(str(fx_usd_to_base))
-        if fx_usd_to_base <= 0:
-            raise InvalidExchangeRateError(fx_usd_to_base)
+        # Se alguma compra falhar (RF6), a exceção sobe e nenhuma carteira é devolvida.
+        for asset_id, quantidade, preco_usd, fx in self._ordens:
+            carteira.execute_trade(asset_id, TradeSide.BUY, quantidade, preco_usd, fx_usd_to_base=fx)
 
-        cost_usd = quantity * price_usd
-        cost_base_value = cost_usd * fx_usd_to_base
-        cost_amount = Amount(cost_base_value, self.__base_currency)
-
-        with self.__lock:
-            if side == TradeSide.BUY:
-                if cost_amount > self.__cash:
-                    raise InsufficientBalanceError(
-                        self.__base_currency, cost_amount.value, self.__cash.value
-                    )
-                new_cash = self.__cash - cost_amount
-                new_qty = self.__positions.get(asset_id, Decimal("0")) + quantity
-                # só agora, com tudo validado, mutamos o estado:
-                self.__cash = new_cash
-                self.__positions[asset_id] = new_qty
-
-            elif side == TradeSide.SELL:
-                held = self.__positions.get(asset_id, Decimal("0"))
-                if quantity > held:
-                    raise InsufficientPositionError(asset_id, quantity, held)
-                new_qty = held - quantity
-                new_cash = self.__cash + cost_amount
-                self.__cash = new_cash
-                if new_qty == 0:
-                    self.__positions.pop(asset_id, None)
-                else:
-                    self.__positions[asset_id] = new_qty
-            else:
-                raise ValueError(f"Lado de negociação desconhecido: {side}")
-
-            trade = self.__audit.record(
-                asset_id=asset_id,
-                side=side,
-                quantity=quantity,
-                price_usd=price_usd,
-                cash_currency=self.__base_currency,
-                cash_amount=cost_base_value,
-            )
-        return trade
+        return carteira

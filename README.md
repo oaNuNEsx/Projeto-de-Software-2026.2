@@ -320,6 +320,30 @@ Portanto, uma nova estratégia registrada no RF9 passa automaticamente a partici
 do RF10.
 
 ---
+# Padrões de Projeto
+
+## Padrões Criacionais
+
+### Prototype
+
+A carteira e compra inicial eram sempre refeitas para cada estratégia, apenas para que todas pudessem partir do mesmo princípio no torneio de estratégias (RF10), mas que é feito por convenção, e não por construção. O prototype é aplicado para que várias instâncias idênticas sejam clonadas para garantir as mesma execuções automaticamente.
+* Aplicando em Tournament.run(), onde a carteira é montada uma vez com carteira_incial e cada estratégia é copiada com carteira_inicial_clonar().
+* Com isso, a única forma de alterar um clone é por execute_trade() do mesmo.
+A solução aplicada anteriormente não funciona completamente, pois a cópia permite alterações nos dados originais de forma incoerente.
+
+### Builder
+
+A carteira inicial do torneiro é montada em várias etapas e, quando finalizada, validada em outro lugar. O Builder é aplicado para reunir essas etapas em chamadas nomeadas, além de validá-las antes de formar a carteira final.
+Foi aplicada usando uma classe portfólio PortifolioBulder, com os métodos:
+* .com_moeda_base: Define qual a moeda base da carteira (é mantido durante todas as operações)
+* .com_caixa_inicial: Define o valor inicial da carteira (na moeda base).
+* .com_precos: Define Os preços de cada ativo na moeda base.
+* .com_posicao_por_peso: Quanto cada caixa inicial vale para o ativo (intervalo [0,1]).
+* .com_posicao: Define uma compra de quantidade fixa, aplicada pelo usário.
+* .build: Valida os métodos anteriores, cria o objeto Portifolio e realiza as operações da carteira.
+Assim, nenhuma informação é inserida diretamente e sim por execute_trade(), portanto as funcionalidades aplicadas antes ainda são válidas para as carteiras formadas.
+
+---
 
 # Testes
 

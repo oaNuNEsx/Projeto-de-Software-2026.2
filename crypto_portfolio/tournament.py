@@ -14,9 +14,10 @@ from decimal import Decimal
 from typing import Dict, List
 
 from .assets import Asset
-from .audit import AuditTrail, TradeSide
+from .audit import TradeSide
 from .errors import TradingError
 from .portfolio import Portfolio
+from .portfolio_builder import PortfolioBuilder
 from .strategies import available_strategies, Action
 from .market_data import HistoricalSeries, MarketPoint
 
@@ -46,11 +47,7 @@ class Tournament:
             "ethereum": Decimal("0.35"),
         }
 
-        total_weight = sum(self.initial_weights.values(), Decimal("0"))
-        if total_weight < 0 or total_weight > 1:
-            raise ValueError("A soma dos pesos iniciais deve ficar entre 0 e 1.")
-        if any(weight < 0 for weight in self.initial_weights.values()):
-            raise ValueError("Pesos iniciais não podem ser negativos.")
+        PortfolioBuilder.validar_pesos(self.initial_weights)
 
     def _snapshot_at(self, timestamp_ms: int) -> Dict[str, MarketPoint]:
         snapshot: Dict[str, MarketPoint] = {}
@@ -75,24 +72,16 @@ class Tournament:
             )
         return snapshot
 
-    def _seed_portfolio(self, portfolio: Portfolio, initial_cash_usd: Decimal,
-                        snapshot: Dict[str, MarketPoint]) -> None:
+    def _montar_carteira_inicial(self, base_currency: str, initial_cash_usd: Decimal,
+                                 snapshot: Dict[str, MarketPoint]) -> Portfolio:
+        """Builder: monta a carteira inicial (caixa + compras por peso) em etapas nomeadas."""
+        builder = (PortfolioBuilder(self.asset_registry)
+                   .com_moeda_base(base_currency)
+                   .com_caixa_inicial(initial_cash_usd)
+                   .com_precos(snapshot))
         for asset_id, weight in self.initial_weights.items():
-            if weight == 0:
-                continue
-            point = snapshot.get(asset_id)
-            if point is None or point.price_usd <= 0:
-                continue
-            amount_to_invest = initial_cash_usd * weight
-            quantity = (amount_to_invest / point.price_usd).quantize(Decimal("0.00000001"))
-            if quantity > 0:
-                portfolio.execute_trade(
-                    asset_id,
-                    TradeSide.BUY,
-                    quantity,
-                    point.price_usd,
-                    fx_usd_to_base=Decimal("1"),
-                )
+            builder.com_posicao_por_peso(asset_id, weight)
+        return builder.build()
 
     def run(self, initial_cash_usd: Decimal, base_currency: str = "USD",
              step_points: int = 1) -> List[BacktestResult]:
@@ -107,12 +96,14 @@ class Tournament:
         results: List[BacktestResult] = []
         initial_snapshot = self._snapshot_at(timestamps[0])
 
+        # Builder monta a carteira inicial UMA vez; Prototype dá um clone a cada estratégia,
+        # então todas partem exatamente do mesmo estado (RF10) por construção.
+        carteira_inicial = self._montar_carteira_inicial(base_currency, initial_cash_usd, initial_snapshot)
+        initial_value = carteira_inicial.total_value_usd(initial_snapshot).value + carteira_inicial.cash.value
+
         for name, strategy_cls in available_strategies().items():
             strategy = strategy_cls()
-            portfolio = Portfolio(base_currency, initial_cash_usd, self.asset_registry, AuditTrail())
-            self._seed_portfolio(portfolio, initial_cash_usd, initial_snapshot)
-
-            initial_value = portfolio.total_value_usd(initial_snapshot).value + portfolio.cash.value
+            portfolio = carteira_inicial.clonar()
 
             for ts in timestamps:
                 snapshot = self._snapshot_at(ts)
