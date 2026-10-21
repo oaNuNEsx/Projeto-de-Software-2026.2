@@ -69,7 +69,7 @@ crypto_portfolio/
 ├── portfolio.py          # RF1 — Portfolio protegido e execute_trade() + Prototype
 ├── portfolio_builder.py  # Builder — PortfolioBuilder (padrão criacional)
 ├── risk_models.py        # RF5 — modelos de risco plugáveis
-├── market_data.py        # RF3 — histórico imutável | RF8 — API, cache, rate limit e retry
+├── market_data.py        # RF3 — histórico imutável | RF8 — API, cache, rate limit e retry + Adapter (padrão estrutural)
 ├── strategies.py         # RF9 — Strategy + registro aberto + Decorator (padrão estrutural)
 └── tournament.py         # RF10 — execução e ranking das estratégias
 
@@ -78,6 +78,7 @@ tests/test_offline.py                # testes automatizados sem dependência de 
 tests/test_prototype.py              # testes do padrão Prototype
 tests/test_prototype_and_builder.py  # testes do padrão Builder
 tests/test_decorator.py              # testes do padrão Decorator
+tests/test_adapter.py                # testes do padrão Adapter
 index.html                           # diagrama do projeto
 requirements.txt                     # dependências
 ```
@@ -233,7 +234,7 @@ uma nova execução, um novo estado em memória é criado.
 
 Este é o requisito que demonstra diretamente a integração com a **CoinGecko**.
 
-O `PriceService`:
+O `PriceService`, em conjunto com o `CoinGeckoAdapter` que busca os preços:
 
 - busca preços atuais;
 - consulta BTC, ETH e USDT em lote;
@@ -244,6 +245,10 @@ O `PriceService`:
 - respeita `Retry-After` quando fornecido;
 - aplica backoff antes de novas tentativas.
 
+O cache, a deduplicação e o TTL ficam no `PriceService`. O limitador, o tratamento de
+HTTP 429, o `Retry-After` e o backoff ficam no `CoinGeckoAdapter` (ver Adapter em
+[Padrões de Projeto](#padrões-de-projeto)).
+
 Na demonstração, duas consultas iguais feitas em sequência reutilizam os dados em
 cache.
 
@@ -251,7 +256,8 @@ cache.
 
 # Uso da CoinGecko
 
-A integração externa fica encapsulada em `crypto_portfolio/market_data.py`.
+A integração externa fica encapsulada em `crypto_portfolio/market_data.py`: os preços atuais
+passam pelo `CoinGeckoAdapter` e o histórico, pelo `HistoricalDataStore`.
 
 Os principais recursos utilizados são:
 
@@ -380,6 +386,76 @@ strategy = LoggingDecorator(
 
 Os decorators não são registrados com `@register_strategy` — são wrappers opcionais, não estratégias independentes.
 
+### Adapter
+
+**Código principal:** `crypto_portfolio/market_data.py`
+
+**Problema.** O `PriceService` fazia dois trabalhos ao mesmo tempo: guardar preços em cache e deduplicar pedidos (RF8) e conversar com a CoinGecko. Tudo o que é específico dessa API estava dentro dele: os endpoints (`/coins/markets` e `/simple/price`), os nomes dos campos do JSON (`current_price`, `price_change_percentage_24h`, `market_cap_rank`), o limite de requisições e o retry em HTTP 429. Isso causava dois problemas concretos:
+
+1. **O RF8 só podia ser verificado com internet.** O cache e a deduplicação ("3 estratégias, 1 chamada") dependiam da CoinGecko ao vivo, e nenhum teste usava o `PriceService`.
+2. **Trocar a fonte de preços exigiria reescrever o serviço** ou enchê-lo de `if/else`, misturando duas APIs na mesma classe.
+
+**Por que Adapter.** A CoinGecko é uma API de terceiros: não controlamos o formato do JSON, os limites nem as mudanças. O Adapter existe para esse caso: traduzir uma interface que não controlamos na interface que o nosso código espera. O `PriceService` passa a depender só de um contrato pequeno (`PriceAdapter.fetch_market_data`), e toda a tradução da CoinGecko fica em uma classe. Outros padrões do projeto não resolveriam isto: o Decorator mantém a interface e acrescenta comportamento, e aqui é preciso **traduzir** uma interface.
+
+**Como foi aplicado.**
+
+* `PriceAdapter` (Target): interface abstrata com `fetch_market_data(coin_ids)`. Devolve `{id: MarketPoint}` só para os ids que a fonte conhece e deixa as falhas de rede subirem como exceção.
+* `CoinGeckoAdapter` (Adapter): contém o código que já existia, movido sem mudar o comportamento: endpoints, tradução do JSON para `MarketPoint`, `TokenBucketRateLimiter` e retry em HTTP 429 (`Retry-After` e backoff). O limitador fica aqui, e não no `PriceService`, porque cada busca faz **duas** requisições (USD e BRL) e ele é consultado a cada uma. Se ficasse no serviço, contaria uma por busca e o RF8 seria violado.
+* `StaticDataAdapter`: preços fixos em memória, sem rede, para testes e demonstrações offline.
+* `PriceService`: mantém o cache com TTL, a deduplicação e o `Lock` (o que não depende da fonte) e recebe o adaptador por injeção. Sem `adapter`, usa um `CoinGeckoAdapter`, então `PriceService(cache_ttl=30.0, max_calls_per_minute=10)` continua valendo. Passar `session` e `adapter` juntos é recusado, porque a sessão HTTP pertence ao adaptador.
+
+```mermaid
+classDiagram
+    class PriceAdapter {
+        <<abstract>>
+        +fetch_market_data(coin_ids)
+    }
+    class CoinGeckoAdapter {
+        -_session
+        -_limiter
+        +fetch_market_data(coin_ids)
+    }
+    class StaticDataAdapter {
+        -_data
+        +fetch_market_data(coin_ids)
+    }
+    class PriceService {
+        -_adapter
+        -_cache
+        +get_prices(coin_ids)
+    }
+    PriceAdapter <|-- CoinGeckoAdapter
+    PriceAdapter <|-- StaticDataAdapter
+    PriceService o-- PriceAdapter : usa
+```
+
+Exemplo de uso:
+
+```python
+# Produção: a CoinGecko
+servico = PriceService(cache_ttl=30.0, adapter=CoinGeckoAdapter(max_calls_per_minute=10))
+
+# Testes e demonstrações offline: dados controlados, sem rede
+servico = PriceService(adapter=StaticDataAdapter({"bitcoin": ponto_btc}))
+```
+
+**Conversões com perda.** O `CoinGeckoAdapter` converte preço ou variação ausentes em 0, `market_cap_rank` ausente em 9999 e preço em BRL ausente em 0. Essas decisões já existiam de forma implícita no código; agora estão documentadas na classe e cobertas por teste.
+
+**Trade-offs e alternativas.**
+
+* **Custo:** três classes novas para uma única fonte real. Hoje o ganho imediato é isolar a CoinGecko e testar o RF8 offline. Trocar de provedor (por exemplo, a CoinMarketCap) passa a ser possível, mas essa integração não foi implementada.
+* **Solução mais simples:** injetar uma função `buscar(coin_ids) -> dict` no lugar de uma hierarquia de classes. Funcionaria em Python, mas o adaptador guarda estado (sessão e limitador) e o contrato fica explícito e documentado na interface, por isso foi escolhida a classe.
+* **Padrões parecidos descartados:** Facade, que cria uma interface nova e mais simples para vários subsistemas (aqui o problema é uma interface incompatível, não a complexidade de um subsistema); e Proxy, que mantém a interface e controla o acesso (o cache já existe no `PriceService`, e o Proxy não traduz formatos).
+
+**Onde não foi aplicado.** O `HistoricalDataStore` continua acoplado ao endpoint `market_chart` da CoinGecko. Ele tem o mesmo sinal de alerta, mas exigiria outro contrato (histórico por período) e ficou fora deste trabalho. `Strategy` e `RiskModel` também não precisam de Adapter: são interfaces do próprio projeto, que podemos ajustar diretamente.
+
+**Verificação.**
+
+* `python -m pytest -q` passa com 65 testes: os 47 anteriores e 18 novos em `tests/test_adapter.py`.
+* O `PriceService` anterior (commit `9a5ea50`) e o atual foram comparados em 14 cenários com uma sessão HTTP falsa (cache, TTL, HTTP 429 com e sem `Retry-After`, erros HTTP e de rede, valores nulos). As requisições, as esperas, os resultados e as exceções foram idênticos.
+* A saída do menu offline é idêntica à anterior (328 linhas). Na demonstração do RF8, com a rede simulada, muda apenas a linha que indica o código principal.
+* Nada disso foi executado contra a CoinGecko real; a demonstração ao vivo do RF8 continua dependendo de internet.
+
 ---
 
 # Testes
@@ -391,6 +467,7 @@ tests/test_offline.py                # regras de negócio (RF1-RF7, RF9, RF10)
 tests/test_prototype.py              # padrão Prototype (Portfolio.clonar)
 tests/test_prototype_and_builder.py   # padrão Builder (PortfolioBuilder)
 tests/test_decorator.py              # padrão Decorator (LoggingDecorator, RiskLimitDecorator)
+tests/test_adapter.py                # padrão Adapter (PriceService, CoinGeckoAdapter, StaticDataAdapter)
 ```
 
 Eles foram construídos para validar as regras de negócio sem depender da internet.
@@ -404,7 +481,7 @@ python -m pytest -q
 Resultado esperado na versão atual:
 
 ```text
-47 passed
+65 passed
 ```
 
 A demonstração ao vivo do RF8 depende da CoinGecko e é executada pelo `main.py`.
@@ -422,7 +499,7 @@ A demonstração ao vivo do RF8 depende da CoinGecko e é executada pelo `main.p
 | RF5 | `risk_models.py` | estratégia/modelo plugável |
 | RF6 | `errors.py` / `portfolio.py` | exceções específicas |
 | RF7 | `audit.py` | registro imutável de negociações |
-| RF8 | `market_data.py` | CoinGecko, cache, rate limit e retry |
+| RF8 | `market_data.py` | CoinGecko (via `CoinGeckoAdapter`), cache, rate limit e retry |
 | RF9 | `strategies.py` | registro aberto de estratégias |
 | RF10 | `tournament.py` | execução uniforme e ranking |
 
