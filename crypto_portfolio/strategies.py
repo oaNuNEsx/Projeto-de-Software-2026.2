@@ -155,3 +155,114 @@ class StopLossStrategy(Strategy):
             recs.append(Recommendation(self.name, Action.HOLD, "-", Decimal("0"),
                                         "Nenhum ativo ultrapassou o limite de queda."))
         return recs
+
+
+# ------------------------------------------------------------------ #
+# Padrão Decorator (estrutural): envoltórios para Strategy
+# ------------------------------------------------------------------ #
+
+from .assets import Asset
+
+
+class StrategyDecorator(Strategy):
+    """
+    Decorator base abstrato para estratégias (Padrão Decorator).
+
+    Envolve uma instância de `Strategy` e repassa chamadas a ela por padrão.
+    Subclasses concretas podem estender ou modificar o comportamento de
+    `evaluate` antes ou depois da delegação à estratégia envolvida.
+    """
+
+    def __init__(self, wrapped: Strategy) -> None:
+        self._wrapped = wrapped
+
+    @property
+    def name(self) -> str:
+        """Delega o nome à estratégia envelopada."""
+        return self._wrapped.name
+
+    def evaluate(
+        self, portfolio, market_snapshot, asset_registry: Dict[str, Asset] | None, context: dict | None = None
+    ) -> List[Recommendation]:
+        """Delega a avaliação de mercado à estratégia envelopada por padrão."""
+        return self._wrapped.evaluate(
+            portfolio, market_snapshot, asset_registry, context if context is not None else {}
+        )
+
+
+class LoggingDecorator(StrategyDecorator):
+    """
+    Decorator que registra em log todas as recomendações emitidas pela estratégia.
+
+    Acumula mensagens formatadas internamente e oferece acesso somente-leitura
+    por meio de uma tupla imutável (cópia defensiva), além de método para limpeza.
+    """
+
+    def __init__(self, wrapped: Strategy) -> None:
+        super().__init__(wrapped)
+        self._log: list[str] = []
+
+    @property
+    def log(self) -> tuple[str, ...]:
+        """Devolve uma cópia imutável (tupla) do histórico de logs."""
+        return tuple(self._log)
+
+    def limpar_log(self) -> None:
+        """Limpa todo o histórico de logs acumulado."""
+        self._log.clear()
+
+    def evaluate(
+        self, portfolio, market_snapshot, asset_registry: Dict[str, Asset] | None, context: dict | None = None
+    ) -> List[Recommendation]:
+        """Executa a estratégia envelopada e registra cada recomendação no log."""
+        recs = self._wrapped.evaluate(
+            portfolio, market_snapshot, asset_registry, context if context is not None else {}
+        )
+        for rec in recs:
+            msg = f"[{rec.strategy_name}] {rec.action.value} {rec.asset_id} qtd={rec.quantity} | {rec.reason}"
+            self._log.append(msg)
+        return recs
+
+
+class RiskLimitDecorator(StrategyDecorator):
+    """
+    Decorator que filtra recomendações de compra caso o risco do ativo exceda o limite.
+
+    Ordens de COMPRA (BUY) para ativos cujo `risk_score(market_snapshot)` seja superior
+    a `max_risk` são convertidas em MANTER (HOLD), justificando o bloqueio.
+    Ordens de MANTER (HOLD) e VENDER (SELL) passam inalteradas.
+    """
+
+    def __init__(self, wrapped: Strategy, max_risk: Decimal = Decimal("50")) -> None:
+        super().__init__(wrapped)
+        self.max_risk = Decimal(str(max_risk))
+
+    def evaluate(
+        self, portfolio, market_snapshot, asset_registry: Dict[str, Asset] | None, context: dict | None = None
+    ) -> List[Recommendation]:
+        """Executa a avaliação e bloqueia compras de ativos que ultrapassam max_risk."""
+        recs = self._wrapped.evaluate(
+            portfolio, market_snapshot, asset_registry, context if context is not None else {}
+        )
+        filtered: list[Recommendation] = []
+        for rec in recs:
+            if rec.action == Action.BUY:
+                asset = asset_registry.get(rec.asset_id) if asset_registry else None
+                if asset is not None:
+                    risk = asset.risk_score(market_snapshot)
+                    if risk > self.max_risk:
+                        filtered.append(
+                            Recommendation(
+                                strategy_name=rec.strategy_name,
+                                action=Action.HOLD,
+                                asset_id=rec.asset_id,
+                                quantity=Decimal("0"),
+                                reason=(
+                                    f"Compra bloqueada por limite de risco: score de risco ({risk}) "
+                                    f"excede o máximo permitido ({self.max_risk})."
+                                ),
+                            )
+                        )
+                        continue
+            filtered.append(rec)
+        return filtered
