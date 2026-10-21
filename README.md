@@ -62,20 +62,24 @@ do requisito, servindo como guia para a apresentação do código.
 
 ```text
 crypto_portfolio/
-├── money.py          # RF2 — Amount e proteção contra mistura implícita de moedas
-├── errors.py         # RF6 — exceções específicas para falhas de negociação
-├── assets.py         # RF4 — Asset abstrata + Coin / Stablecoin / Token
-├── audit.py          # RF7 — Trade imutável + AuditTrail
-├── portfolio.py      # RF1 — Portfolio protegido e execute_trade()
-├── risk_models.py    # RF5 — modelos de risco plugáveis
-├── market_data.py    # RF3 — histórico imutável | RF8 — API, cache, rate limit e retry
-├── strategies.py     # RF9 — Strategy + registro aberto de estratégias
-└── tournament.py     # RF10 — execução e ranking das estratégias
+├── money.py              # RF2 — Amount e proteção contra mistura implícita de moedas
+├── errors.py             # RF6 — exceções específicas para falhas de negociação
+├── assets.py             # RF4 — Asset abstrata + Coin / Stablecoin / Token
+├── audit.py              # RF7 — Trade imutável + AuditTrail
+├── portfolio.py          # RF1 — Portfolio protegido e execute_trade() + Prototype
+├── portfolio_builder.py  # Builder — PortfolioBuilder (padrão criacional)
+├── risk_models.py        # RF5 — modelos de risco plugáveis
+├── market_data.py        # RF3 — histórico imutável | RF8 — API, cache, rate limit e retry
+├── strategies.py         # RF9 — Strategy + registro aberto + Decorator (padrão estrutural)
+└── tournament.py         # RF10 — execução e ranking das estratégias
 
-main.py               # demonstração RF1 → RF10
-tests/test_offline.py # testes automatizados sem dependência de rede
-index.html            # diagrama do projeto
-requirements.txt      # dependências
+main.py                              # demonstração RF1 → RF10
+tests/test_offline.py                # testes automatizados sem dependência de rede
+tests/test_prototype.py              # testes do padrão Prototype
+tests/test_prototype_and_builder.py  # testes do padrão Builder
+tests/test_decorator.py              # testes do padrão Decorator
+index.html                           # diagrama do projeto
+requirements.txt                     # dependências
 ```
 
 ---
@@ -343,6 +347,39 @@ Foi aplicada usando uma classe portfólio PortifolioBulder, com os métodos:
 * .build: Valida os métodos anteriores, cria o objeto Portifolio e realiza as operações da carteira.
 Assim, nenhuma informação é inserida diretamente e sim por execute_trade(), portanto as funcionalidades aplicadas antes ainda são válidas para as carteiras formadas.
 
+## Padrões Estruturais
+
+### Decorator
+
+**Código principal:** `crypto_portfolio/strategies.py`
+
+As estratégias (HODL, DCA, Rebalanceamento, Stop-Loss) devolvem recomendações puras. Em cenários reais, é necessário adicionar comportamentos transversais — como logging de decisões ou limites de risco — sem modificar o código de cada estratégia individualmente.
+
+O Decorator envolve uma estratégia existente e adiciona comportamento antes ou depois do `evaluate()`, preservando a interface `Strategy`. Decorators podem ser empilhados livremente.
+
+Foram implementadas três classes:
+
+* `StrategyDecorator(Strategy)`: classe base abstrata que recebe uma estratégia (`_wrapped`) e delega `name` e `evaluate()` a ela por padrão. Como herda de `Strategy`, qualquer decorator é intercambiável com uma estratégia comum — inclusive no torneio (RF10).
+* `LoggingDecorator(StrategyDecorator)`: registra internamente cada recomendação emitida pela estratégia envolvida. Oferece acesso somente-leitura ao log via tupla imutável e método `limpar_log()` para reiniciar.
+* `RiskLimitDecorator(StrategyDecorator)`: filtra recomendações de compra cujo `risk_score()` do ativo exceda um limiar configurável (`max_risk`). Compras bloqueadas são convertidas em HOLD com justificativa. Vendas e holds passam inalterados.
+
+Exemplo de uso:
+
+```python
+# Estratégia pura
+strategy = DcaStrategy()
+
+# Com logging
+strategy = LoggingDecorator(DcaStrategy())
+
+# Empilhado: logging + limite de risco
+strategy = LoggingDecorator(
+    RiskLimitDecorator(DcaStrategy(), max_risk=Decimal("30"))
+)
+```
+
+Os decorators não são registrados com `@register_strategy` — são wrappers opcionais, não estratégias independentes.
+
 ---
 
 # Testes
@@ -350,7 +387,10 @@ Assim, nenhuma informação é inserida diretamente e sim por execute_trade(), p
 Os testes ficam em:
 
 ```text
-tests/test_offline.py
+tests/test_offline.py                # regras de negócio (RF1-RF7, RF9, RF10)
+tests/test_prototype.py              # padrão Prototype (Portfolio.clonar)
+tests/test_prototype_and_builder.py   # padrão Builder (PortfolioBuilder)
+tests/test_decorator.py              # padrão Decorator (LoggingDecorator, RiskLimitDecorator)
 ```
 
 Eles foram construídos para validar as regras de negócio sem depender da internet.
@@ -364,7 +404,7 @@ python -m pytest -q
 Resultado esperado na versão atual:
 
 ```text
-9 passed
+47 passed
 ```
 
 A demonstração ao vivo do RF8 depende da CoinGecko e é executada pelo `main.py`.

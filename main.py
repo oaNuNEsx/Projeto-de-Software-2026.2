@@ -32,7 +32,9 @@ from crypto_portfolio.money import Amount, CurrencyMismatchError
 from crypto_portfolio.portfolio import Portfolio
 from crypto_portfolio.portfolio_builder import PortfolioBuilder
 from crypto_portfolio.risk_models import get_risk_model
-from crypto_portfolio.strategies import available_strategies
+from crypto_portfolio.strategies import (
+    available_strategies, DcaStrategy, LoggingDecorator, RiskLimitDecorator,
+)
 from crypto_portfolio.tournament import Tournament
 
 
@@ -552,6 +554,55 @@ def demonstrar_rf9() -> None:
         "\n  STOP-LOSS aparece sem o Tournament conhecer essa classe diretamente; "
         "ele entra pelo registro de estratégias."
     )
+
+    # ---- Padrão Decorator (estrutural) ----
+    linha("DECORATOR — Comportamentos adicionais sem modificar estratégias")
+    codigo_principal(
+        "crypto_portfolio/strategies.py -> StrategyDecorator / LoggingDecorator / RiskLimitDecorator"
+    )
+
+    # snapshot com BTC caindo 20% → risk_score = abs(20) * 4 = 80
+    snapshot_risco = {
+        "bitcoin": MarketPoint(Decimal("60000"), Decimal("300000"), Decimal("-20"), 1),
+        "ethereum": MarketPoint(Decimal("3000"), Decimal("15000"), Decimal("1"), 2),
+    }
+    portfolio_dec = Portfolio("USD", Decimal("10000"), DEFAULT_ASSET_REGISTRY)
+
+    # 1) LoggingDecorator: registra cada decisão sem modificar a estratégia
+    print("  1) LoggingDecorator envolvendo DCA (bitcoin):")
+    dca_com_log = LoggingDecorator(DcaStrategy(target_asset="bitcoin"))
+    recs = dca_com_log.evaluate(portfolio_dec, snapshot_risco, DEFAULT_ASSET_REGISTRY, {})
+    for rec in recs:
+        print(f"     {rec.action.value:7s} {rec.asset_id:10s} qtd={rec.quantity}")
+    print(f"     Log acumulado ({len(dca_com_log.log)} entrada(s)):")
+    for msg in dca_com_log.log:
+        print(f"       {msg}")
+
+    # 2) RiskLimitDecorator: bloqueia compras arriscadas
+    print("\n  2) RiskLimitDecorator envolvendo DCA (bitcoin, max_risk=30):")
+    print("     BTC risk_score = abs(-20%) x 4 = 80 -> excede limite de 30")
+    dca_com_risco = RiskLimitDecorator(DcaStrategy(target_asset="bitcoin"), max_risk=Decimal("30"))
+    recs = dca_com_risco.evaluate(portfolio_dec, snapshot_risco, DEFAULT_ASSET_REGISTRY, {})
+    for rec in recs:
+        print(f"     {rec.action.value:7s} {rec.asset_id:10s} | {rec.reason}")
+
+    # 3) Empilhamento: Logging + RiskLimit
+    print("\n  3) Empilhamento: LoggingDecorator(RiskLimitDecorator(DCA)):")
+    dca_empilhado = LoggingDecorator(
+        RiskLimitDecorator(DcaStrategy(target_asset="bitcoin"), max_risk=Decimal("30"))
+    )
+    recs = dca_empilhado.evaluate(portfolio_dec, snapshot_risco, DEFAULT_ASSET_REGISTRY, {})
+    for rec in recs:
+        print(f"     {rec.action.value:7s} {rec.asset_id:10s} | {rec.reason}")
+    print(f"     Log registrou o resultado final ({len(dca_empilhado.log)} entrada(s)):")
+    for msg in dca_empilhado.log:
+        print(f"       {msg}")
+
+    print(
+        "\n  Conclusao: os decorators adicionam logging e limites de risco a"
+        "\n  qualquer estrategia sem modificar seu codigo - e podem ser empilhados."
+    )
+
 
 
 # ---------------------------------------------------------------------------
