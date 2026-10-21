@@ -6,13 +6,20 @@ RF3 — Histórico reprodutível / imutável.
 
 `PriceService`:
   - Deduplica ids e usa cache com TTL curto, então N estratégias pedindo
-    o preço do BTC no mesmo instante disparam UMA chamada à CoinGecko,
-    não N.
-  - Usa um `TokenBucketRateLimiter` para nunca ultrapassar X chamadas
-    por minuto.
-  - Se mesmo assim receber HTTP 429, espera (respeitando `Retry-After`
-    quando presente) e tenta de novo com backoff exponencial, em vez de
-    simplesmente falhar.
+    o preço do BTC no mesmo instante disparam UMA chamada à fonte de
+    preços, não N.
+  - Não sabe de onde os preços vêm: delega a um `PriceAdapter` (padrão
+    Adapter), injetado no construtor.
+
+`PriceAdapter` / `CoinGeckoAdapter` / `StaticDataAdapter` (padrão Adapter):
+  - `PriceAdapter` é a interface que o `PriceService` espera de qualquer
+    fonte de preços.
+  - `CoinGeckoAdapter` traduz a API da CoinGecko para `MarketPoint`. É ele
+    quem usa o `TokenBucketRateLimiter` (a CADA requisição HTTP, para nunca
+    ultrapassar X chamadas por minuto) e o retry em HTTP 429 (espera,
+    respeitando `Retry-After` quando presente, e tenta de novo com backoff
+    exponencial, em vez de simplesmente falhar).
+  - `StaticDataAdapter` serve preços fixos em memória, sem rede.
 
 `HistoricalDataStore` / `HistoricalSeries`:
   - `HistoricalSeries` guarda os pontos em uma TUPLA de `PricePoint`
@@ -26,6 +33,7 @@ RF3 — Histórico reprodutível / imutável.
 from __future__ import annotations
 import threading
 import time
+from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
 from decimal import Decimal
@@ -98,44 +106,44 @@ def _retrying_get(session: requests.Session, limiter: TokenBucketRateLimiter,
         return resp.json()
 
 
-class PriceService:
-    """Preços 'spot' (atuais), com cache + rate limit compartilhados entre todas as estratégias."""
+class PriceAdapter(ABC):
+    """
+    Target do Adapter: o que o `PriceService` espera de QUALQUER fonte de preços atuais.
 
-    def __init__(self, cache_ttl: float = 30.0, max_calls_per_minute: int = 10, session: requests.Session = None):
-        self._cache: Dict[str, Tuple[float, MarketPoint]] = {}
-        self._cache_ttl = cache_ttl
-        self._limiter = TokenBucketRateLimiter(max_calls_per_minute, 60.0)
+    Contrato:
+      - recebe uma lista de ids (já deduplicada) e devolve {id: MarketPoint} somente para
+        os ids que a fonte conhece; ids desconhecidos simplesmente ficam fora do dicionário;
+      - falhas de rede ou do serviço sobem como exceção (o PriceService não as engole);
+      - cache e deduplicação NÃO são responsabilidade do adaptador: ficam no PriceService.
+    """
+
+    @abstractmethod
+    def fetch_market_data(self, coin_ids: list[str]) -> Dict[str, MarketPoint]:
+        ...
+
+
+class CoinGeckoAdapter(PriceAdapter):
+    """
+    Adapter da CoinGecko: traduz os endpoints e o JSON da API para `MarketPoint`.
+
+    Concentra tudo o que é específico da CoinGecko: URLs, parâmetros, nomes dos campos do
+    JSON (`current_price`, `price_change_percentage_24h`, `market_cap_rank`), o limite de
+    requisições e o retry em HTTP 429. O limitador é consultado a CADA requisição HTTP
+    (cada busca faz duas: preços em USD e preços em BRL), e por isso mora aqui, junto das
+    chamadas, e não no PriceService.
+
+    Conversões com perda (decisões deste adaptador, documentadas e testadas):
+      - preço ou variação de 24h ausente/nulo na resposta vira 0;
+      - `market_cap_rank` ausente/nulo vira 9999;
+      - preço em BRL ausente vira 0.
+    """
+
+    def __init__(self, session: requests.Session = None, limiter: TokenBucketRateLimiter = None,
+                 max_calls_per_minute: int = 10):
         self._session = session or requests.Session()
-        self._lock = threading.Lock()
+        self._limiter = limiter or TokenBucketRateLimiter(max_calls_per_minute, 60.0)
 
-    def get_prices(self, coin_ids: Iterable[str]) -> Dict[str, MarketPoint]:
-        """
-        Ponto único de entrada para preços atuais. Deduplica `coin_ids` e só
-        vai à rede para os que não estão em cache válido — isto é o que
-        garante que avaliar 3 estratégias dispare 1 chamada, não 3.
-        """
-        coin_ids = sorted(set(coin_ids))
-        now = time.monotonic()
-        result: Dict[str, MarketPoint] = {}
-        missing = []
-
-        with self._lock:
-            for cid in coin_ids:
-                cached = self._cache.get(cid)
-                if cached and (now - cached[0]) < self._cache_ttl:
-                    result[cid] = cached[1]
-                else:
-                    missing.append(cid)
-
-        if missing:
-            fetched = self._fetch_from_api(missing)
-            with self._lock:
-                for cid, point in fetched.items():
-                    self._cache[cid] = (time.monotonic(), point)
-                    result[cid] = point
-        return result
-
-    def _fetch_from_api(self, coin_ids: list[str]) -> Dict[str, MarketPoint]:
+    def fetch_market_data(self, coin_ids: list[str]) -> Dict[str, MarketPoint]:
         data = _retrying_get(
             self._session, self._limiter, f"{COINGECKO_BASE}/coins/markets",
             {"vs_currency": "usd", "ids": ",".join(coin_ids), "price_change_percentage": "24h"},
@@ -159,6 +167,66 @@ class PriceService:
             {"ids": ",".join(coin_ids), "vs_currencies": "brl"},
         )
         return {cid: Decimal(str(v.get("brl", 0))) for cid, v in data.items()}
+
+
+class StaticDataAdapter(PriceAdapter):
+    """Adapter de dados fixos em memória: sem rede e determinístico (testes e demonstrações offline)."""
+
+    def __init__(self, data: Dict[str, MarketPoint]):
+        self._data = dict(data)
+
+    def fetch_market_data(self, coin_ids: list[str]) -> Dict[str, MarketPoint]:
+        return {cid: self._data[cid] for cid in coin_ids if cid in self._data}
+
+
+class PriceService:
+    """
+    Preços 'spot' (atuais), com cache compartilhado entre todas as estratégias.
+
+    O serviço não sabe de onde os preços vêm: busca-os por um `PriceAdapter`. Sem `adapter`,
+    usa um `CoinGeckoAdapter` (mesmo comportamento de antes, com `session` e
+    `max_calls_per_minute`). Com `adapter`, a sessão HTTP e o limite de requisições pertencem
+    ao adaptador, então `session` não pode ser informada junto e `max_calls_per_minute` não
+    é usado.
+    """
+
+    def __init__(self, cache_ttl: float = 30.0, max_calls_per_minute: int = 10,
+                 session: requests.Session = None, adapter: PriceAdapter = None):
+        if adapter is not None and session is not None:
+            raise ValueError("Informe `session` OU `adapter`: a sessão HTTP pertence ao adaptador.")
+        self._cache: Dict[str, Tuple[float, MarketPoint]] = {}
+        self._cache_ttl = cache_ttl
+        if adapter is None:
+            adapter = CoinGeckoAdapter(session=session, max_calls_per_minute=max_calls_per_minute)
+        self._adapter = adapter
+        self._lock = threading.Lock()
+
+    def get_prices(self, coin_ids: Iterable[str]) -> Dict[str, MarketPoint]:
+        """
+        Ponto único de entrada para preços atuais. Deduplica `coin_ids` e só
+        vai à fonte de preços para os que não estão em cache válido — isto é o que
+        garante que avaliar 3 estratégias dispare 1 chamada, não 3.
+        """
+        coin_ids = sorted(set(coin_ids))
+        now = time.monotonic()
+        result: Dict[str, MarketPoint] = {}
+        missing = []
+
+        with self._lock:
+            for cid in coin_ids:
+                cached = self._cache.get(cid)
+                if cached and (now - cached[0]) < self._cache_ttl:
+                    result[cid] = cached[1]
+                else:
+                    missing.append(cid)
+
+        if missing:
+            fetched = self._adapter.fetch_market_data(missing)
+            with self._lock:
+                for cid, point in fetched.items():
+                    self._cache[cid] = (time.monotonic(), point)
+                    result[cid] = point
+        return result
 
 
 class HistoricalSeries:

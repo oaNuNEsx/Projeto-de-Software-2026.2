@@ -23,6 +23,7 @@ from crypto_portfolio.assets import DEFAULT_ASSET_REGISTRY
 from crypto_portfolio.audit import TradeSide
 from crypto_portfolio.errors import TradingError
 from crypto_portfolio.market_data import (
+    CoinGeckoAdapter,
     HistoricalSeries,
     MarketPoint,
     PricePoint,
@@ -480,7 +481,7 @@ def demonstrar_rf7(state: DemoState) -> None:
 def demonstrar_rf8(price_service: PriceService) -> None:
     linha("RF8 — PREÇOS CIENTES DE LIMITE DE REQUISIÇÕES")
     codigo_principal(
-        "crypto_portfolio/market_data.py -> PriceService / TokenBucketRateLimiter / _retrying_get"
+        "crypto_portfolio/market_data.py -> PriceService / CoinGeckoAdapter / TokenBucketRateLimiter / _retrying_get"
     )
 
     print("  Esta é a única demonstração que precisa da CoinGecko ao vivo.")
@@ -663,7 +664,8 @@ def mostrar_menu() -> None:
 def main() -> None:
     state = DemoState()
     # Uma única instância durante a sessão: o cache do RF8 pode ser reaproveitado.
-    price_service = PriceService(cache_ttl=30.0, max_calls_per_minute=10)
+    # Adapter: o PriceService recebe a fonte de preços; aqui, a CoinGecko.
+    price_service = PriceService(cache_ttl=30.0, adapter=CoinGeckoAdapter(max_calls_per_minute=10))
 
     acoes = {
         "1": lambda: demonstrar_rf1(state),
